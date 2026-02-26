@@ -22,7 +22,10 @@ function formatPct(value: number) {
 }
 
 /**
- * Zinseszins: monatliche Verzinsung, monatliche Einzahlung (am Monatsende).
+ * Zinseszins: monatliche Verzinsung, monatliche Einzahlung (am Monatsende / nachschüssig).
+ * annualReturnPct wird als EFFEKTIVE Rendite p.a. interpretiert (wie zinsen-berechnen.de).
+ * Monatszins: i = (1 + r)^(1/12) - 1
+ *
  * FV = initial*(1+i)^n + P * [((1+i)^n - 1)/i]
  */
 function futureValueMonthly(params: {
@@ -33,8 +36,9 @@ function futureValueMonthly(params: {
 }) {
   const P = Math.max(0, params.monthlyContribution);
   const n = Math.max(0, Math.floor(params.months));
+
   const r = params.annualReturnPct / 100;
-  const i = r / 12;
+  const i = Math.pow(1 + r, 1 / 12) - 1; // <-- KORREKTUR: effektiv p.a. -> effektiv pro Monat
 
   const initial = Math.max(0, params.initial);
 
