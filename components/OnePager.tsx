@@ -2,6 +2,7 @@
 
 import AltersvorsorgeRechner from "@/components/AltersvorsorgeRechner";
 import FruehstartRechner from "@/components/FruehstartRechner";
+import RenditeRechner from "@/components/RenditeRechner";
 
 export default function OnePager() {
   return (
@@ -101,7 +102,9 @@ export default function OnePager() {
           />
           <FruehstartRechner />
         </section>
-
+        <section id="rendite" className="scroll-mt-24">
+  <RenditeRechner />
+</section>
         <section id="faq" className="mt-14 scroll-mt-24">
           <SectionTitle
             kicker="FAQ"
