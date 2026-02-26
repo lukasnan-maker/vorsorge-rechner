@@ -11,7 +11,12 @@ function formatEUR(value: number) {
 }
 
 /**
- * Monatliche Verzinsung, Einzahlung am Monatsende.
+ * Monatliche Verzinsung, Einzahlung am Monatsende (nachschüssig).
+ *
+ * Wichtig: annualReturnPct wird als EFFEKTIVE Rendite p.a. interpretiert (wie zinsen-berechnen.de).
+ * Umrechnung in Monatszins:
+ *   i = (1 + r)^(1/12) - 1
+ *
  * FV = initial*(1+i)^n + P * [((1+i)^n - 1)/i]
  */
 function futureValueMonthly(params: {
@@ -23,7 +28,9 @@ function futureValueMonthly(params: {
   const P = Math.max(0, params.monthlyContribution);
   const n = Math.max(0, Math.floor(params.months));
   const r = params.annualReturnPct / 100;
-  const i = r / 12;
+
+  // Effektiv p.a. -> effektiv pro Monat
+  const i = Math.pow(1 + r, 1 / 12) - 1;
 
   const initial = Math.max(0, params.initial);
 
@@ -83,8 +90,6 @@ export default function FruehstartRechner() {
     const totalPrivatePaid_after18 = privAfter * extraMonths;
 
     // Kapital bis Zielalter:
-    // Phase 1: 6–18 Einzahlung (state+priv) -> capitalAt18
-    // Phase 2: ab 18 bis Zielalter Einzahlung nur privAfter (falls aktiv)
     const capitalAtTarget = extraMonths
       ? futureValueMonthly({
           monthlyContribution: privAfter,
@@ -261,11 +266,14 @@ export default function FruehstartRechner() {
                 <span className="text-sm text-neutral-600">%</span>
               </div>
             </div>
-            <p className="mt-2 text-xs text-neutral-500">Rechnung mit monatlicher Verzinsung, Einzahlung am Monatsende.</p>
+            <p className="mt-2 text-xs text-neutral-500">
+              Rechnung mit monatlicher Verzinsung (effektiv umgerechnet), Einzahlung am Monatsende.
+            </p>
           </div>
         </div>
       </div>
 
+      {/* Rest unverändert */}
       <div className="md:col-span-3">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <h3 className="text-xl font-semibold text-neutral-900">Ergebnis</h3>
@@ -302,7 +310,11 @@ export default function FruehstartRechner() {
               <Line label="Rendite" value={`${res.annualReturnPct} % p.a.`} />
               <Line
                 label="Ab 18"
-                value={res.continueAfter18 ? `${formatEUR(res.privateAfter18)} / Monat bis ${res.targetAge}` : "keine privaten Beiträge nach 18"}
+                value={
+                  res.continueAfter18
+                    ? `${formatEUR(res.privateAfter18)} / Monat bis ${res.targetAge}`
+                    : "keine privaten Beiträge nach 18"
+                }
               />
             </div>
           </div>
