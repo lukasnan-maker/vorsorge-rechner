@@ -14,45 +14,85 @@ function formatEUR(value: number) {
 }
 
 function formatPct(value: number) {
-  return new Intl.NumberFormat("de-DE", { style: "percent", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("de-DE", {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/**
+ * Zinseszins: monatliche Verzinsung, monatliche Einzahlung (am Monatsende).
+ * FV = initial*(1+i)^n + P * [((1+i)^n - 1)/i]
+ */
+function futureValueMonthly(params: {
+  monthlyContribution: number;
+  months: number;
+  annualReturnPct: number;
+  initial: number;
+}) {
+  const P = Math.max(0, params.monthlyContribution);
+  const n = Math.max(0, Math.floor(params.months));
+  const r = params.annualReturnPct / 100;
+  const i = r / 12;
+
+  const initial = Math.max(0, params.initial);
+
+  if (n === 0) return initial;
+  if (Math.abs(i) < 1e-12) return initial + P * n;
+
+  const pow = Math.pow(1 + i, n);
+  return initial * pow + P * ((pow - 1) / i);
 }
 
 function calcZulagen(params: { eigenJahr: number; children: number; yearMode: YearMode; bonusUnder25: boolean }) {
-  const E = Math.max(0, params.eigenJahr);
+  const eigenRaw = Math.max(0, params.eigenJahr);
   const children = clamp(params.children, 0, 12);
+
+  // Förderlogik: Zulagen nur bis max 1.800 €/Jahr
+  const eigenFoerderfaehig = Math.min(eigenRaw, 1800);
 
   const rate1 = params.yearMode === "from_2029" ? 0.35 : 0.30;
   const rate2 = 0.20;
   const childRate = 0.25;
 
-  const E1 = Math.min(E, 1200);
-  const E2 = Math.min(Math.max(E - 1200, 0), 600);
+  // Stufen auf Basis des förderfähigen Eigenbeitrags
+  const E1 = Math.min(eigenFoerderfaehig, 1200);
+  const E2 = Math.min(Math.max(eigenFoerderfaehig - 1200, 0), 600);
 
   const Z1 = E1 * rate1;
   const Z2 = E2 * rate2;
-  const base = Z1 + Z2;
+  const grundzulage = Z1 + Z2;
 
-  const childPer = Math.min(E, 1200) * childRate;
-  const childTotal = children * childPer;
+  // Kinderzulage: 0,25 €/€ bis 1.200 €/Jahr (= max. 300 €/Kind)
+  // Sauber: ebenfalls auf Basis des förderfähigen Beitrags (und bis 1.200)
+  const childBase = Math.min(eigenFoerderfaehig, 1200);
+  const kinderzulageProKind = childBase * childRate;
+  const kinderzulageTotal = children * kinderzulageProKind;
 
-  const totalAnnual = base + childTotal;
-  const totalIntoContract = E + totalAnnual;
+  const zulageTotal = grundzulage + kinderzulageTotal;
+
+  // In den Vertrag fließt: tatsächlicher Eigenbeitrag + Zulagen (Zulagen aber nur aus förderfähigem Anteil)
+  const totalIntoContract = eigenRaw + zulageTotal;
 
   const bonusOneOff = params.bonusUnder25 ? 200 : 0;
-  const fundingRate = E > 0 ? totalAnnual / E : 0;
+
+  // Förderquote sinnvollerweise bezogen auf tatsächlichen Eigenbeitrag (was zahle ich selbst vs. was kommt dazu)
+  const fundingRate = eigenRaw > 0 ? zulageTotal / eigenRaw : 0;
 
   return {
-    eigen: E,
-    grundzulage: base,
+    eigenRaw,
+    eigenFoerderfaehig,
+    grundzulage,
     grundzulageStufe1: Z1,
     grundzulageStufe2: Z2,
-    kinderzulageProKind: childPer,
-    kinderzulageTotal: childTotal,
-    zulageTotal: totalAnnual,
+    kinderzulageProKind,
+    kinderzulageTotal,
+    zulageTotal,
     totalIntoContract,
     fundingRate,
     bonusOneOff,
-    cappedInfo: E > 1800,
+    cappedInfo: eigenRaw > 1800,
   };
 }
 
@@ -64,6 +104,10 @@ export default function AltersvorsorgeRechner() {
   const [bonusUnder25, setBonusUnder25] = useState<boolean>(false);
   const [openHow, setOpenHow] = useState<boolean>(false);
 
+  // Neu: Rendite & Laufzeit
+  const [annualReturnPct, setAnnualReturnPct] = useState<number>(6);
+  const [yearsInvest, setYearsInvest] = useState<number>(30);
+
   const eigenJahr = useMemo(() => {
     const a = Math.max(0, amount);
     return inputMode === "monthly" ? a * 12 : a;
@@ -74,9 +118,20 @@ export default function AltersvorsorgeRechner() {
     [eigenJahr, children, yearMode, bonusUnder25]
   );
 
-  const eigenMonat = res.eigen / 12;
+  const eigenMonat = res.eigenRaw / 12;
   const zulageMonat = res.zulageTotal / 12;
   const totalMonat = res.totalIntoContract / 12;
+
+  const monthsInvest = useMemo(() => Math.max(0, Math.floor(yearsInvest * 12)), [yearsInvest]);
+
+  const endkapital = useMemo(() => {
+    return futureValueMonthly({
+      monthlyContribution: totalMonat,
+      months: monthsInvest,
+      annualReturnPct: clamp(annualReturnPct, -50, 50),
+      initial: res.bonusOneOff,
+    });
+  }, [totalMonat, monthsInvest, annualReturnPct, res.bonusOneOff]);
 
   return (
     <section className="grid gap-6 md:grid-cols-5">
@@ -233,9 +288,45 @@ export default function AltersvorsorgeRechner() {
             </div>
           </div>
 
+          {/* Neu: Rendite & Laufzeit */}
+          <div className="mt-5 rounded-xl border bg-white p-4">
+            <div className="text-sm font-medium text-neutral-800">Rendite & Laufzeit</div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <label className="text-sm text-neutral-700">Rendite p.a.</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={Number.isFinite(annualReturnPct) ? annualReturnPct : 0}
+                  onChange={(e) => setAnnualReturnPct(clamp(Number(e.target.value || 0), -50, 50))}
+                  className="w-24 rounded-xl border px-3 py-2 text-sm"
+                />
+                <span className="text-sm text-neutral-600">%</span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <label className="text-sm text-neutral-700">Laufzeit</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={Number.isFinite(yearsInvest) ? yearsInvest : 0}
+                  onChange={(e) => setYearsInvest(clamp(Number(e.target.value || 0), 0, 80))}
+                  className="w-24 rounded-xl border px-3 py-2 text-sm"
+                />
+                <span className="text-sm text-neutral-600">Jahre</span>
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs text-neutral-500">
+              Berechnung: monatliche Einzahlung = „Gesamt im Vertrag“ pro Monat, monatliche Verzinsung (Zinseszins).
+            </p>
+          </div>
+
           {res.cappedInfo && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Hinweis: Für die Zulageberechnung werden nur Eigenbeiträge bis 1.800 €/Jahr berücksichtigt.
+              Hinweis: Für die Zulageberechnung wird nur ein Eigenbeitrag bis 1.800 €/Jahr berücksichtigt (für den Vertrag zählt
+              weiterhin dein voller Beitrag).
             </div>
           )}
         </div>
@@ -258,13 +349,23 @@ export default function AltersvorsorgeRechner() {
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <ResultCard title="Eigenbeitrag" value={formatEUR(res.eigen)} subtitle={`${formatEUR(eigenMonat)} / Monat`} />
+            <ResultCard title="Eigenbeitrag (tatsächlich)" value={formatEUR(res.eigenRaw)} subtitle={`${formatEUR(eigenMonat)} / Monat`} />
             <ResultCard title="Staatliche Zulage" value={formatEUR(res.zulageTotal)} subtitle={`${formatEUR(zulageMonat)} / Monat`} />
             <ResultCard title="Gesamt im Vertrag" value={formatEUR(res.totalIntoContract)} subtitle={`${formatEUR(totalMonat)} / Monat`} />
             <ResultCard
               title="Einmaliger Bonus"
               value={res.bonusOneOff ? formatEUR(res.bonusOneOff) : "–"}
               subtitle={res.bonusOneOff ? "bei Abschluss vor 25" : "nicht ausgewählt"}
+            />
+            <ResultCard
+              title="Endkapital (mit Rendite)"
+              value={formatEUR(endkapital)}
+              subtitle={`${yearsInvest} Jahre · ${annualReturnPct}% p.a.`}
+            />
+            <ResultCard
+              title="Förderfähiger Eigenbeitrag"
+              value={formatEUR(res.eigenFoerderfaehig)}
+              subtitle="max. 1.800 €/Jahr für Zulagen"
             />
           </div>
 
@@ -318,11 +419,15 @@ export default function AltersvorsorgeRechner() {
             {openHow && (
               <div className="mt-3 rounded-xl border bg-neutral-50 p-4 text-sm text-neutral-700">
                 <ul className="list-disc space-y-2 pl-5">
-                  <li>Grundzulage ist beitragsproportional (bis 1.800 €/Jahr).</li>
-                  <li>Bis 1.200 €/Jahr: {yearMode === "from_2029" ? "0,35" : "0,30"} € je € Eigenbeitrag.</li>
-                  <li>1.200–1.800 €/Jahr: 0,20 € je € Eigenbeitrag.</li>
+                  <li>Zulagen sind beitragsproportional und werden nur bis 1.800 €/Jahr berechnet.</li>
+                  <li>Bis 1.200 €/Jahr: {yearMode === "from_2029" ? "0,35" : "0,30"} € je € (Grundzulage).</li>
+                  <li>1.200–1.800 €/Jahr: 0,20 € je € (Grundzulage).</li>
                   <li>Kinderzulage: 0,25 € je € bis 1.200 €/Jahr (max. 300 € pro Kind).</li>
                   <li>Bonus: optional 200 € einmalig (Abschluss vor 25).</li>
+                  <li>
+                    Rendite: monatliche Einzahlung = „Gesamt im Vertrag“ pro Monat, Zinseszins mit {annualReturnPct}% p.a. über{" "}
+                    {yearsInvest} Jahre.
+                  </li>
                 </ul>
               </div>
             )}

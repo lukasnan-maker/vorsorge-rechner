@@ -17,13 +17,28 @@ export default function OnePager() {
           </a>
 
           <nav className="flex items-center gap-2 text-sm">
-            <a href="#pav" className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100">
+            <a
+              href="#pav"
+              className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
+            >
               Altersvorsorgedepot
             </a>
-            <a href="#fruehstart" className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100">
+            <a
+              href="#fruehstart"
+              className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
+            >
               Frühstart-Rente
             </a>
-            <a href="#faq" className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100">
+            <a
+              href="#rendite"
+              className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
+            >
+              Rendite
+            </a>
+            <a
+              href="#faq"
+              className="rounded-full px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
+            >
               FAQ
             </a>
           </nav>
@@ -43,8 +58,9 @@ export default function OnePager() {
             </h1>
 
             <p className="mt-3 max-w-xl text-pretty text-neutral-600">
-              Rechner für die beitragsproportionale Zulage (bis 1.800 €/Jahr) inkl. Kinderzulage und Berufseinsteigerbonus
-              sowie ein Frühstart-Rente Abschnitt (10 €/Monat von 6 bis 18).
+              Rechner für die beitragsproportionale Zulage (bis 1.800 €/Jahr) inkl.
+              Kinderzulage und Berufseinsteigerbonus sowie ein Frühstart-Rente
+              Abschnitt (10 €/Monat von 6 bis 18).
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2">
@@ -60,11 +76,19 @@ export default function OnePager() {
               >
                 Zur Frühstart-Rente
               </a>
+              <a
+                href="#rendite"
+                className="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50"
+              >
+                Zum Rendite-Rechner
+              </a>
             </div>
           </div>
 
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="text-sm font-semibold text-neutral-900">Was du hier bekommst</div>
+            <div className="text-sm font-semibold text-neutral-900">
+              Was du hier bekommst
+            </div>
             <ul className="mt-3 space-y-2 text-sm text-neutral-700">
               <li className="flex gap-2">
                 <span className="mt-1 h-1.5 w-1.5 rounded-full bg-neutral-900" />
@@ -102,9 +126,16 @@ export default function OnePager() {
           />
           <FruehstartRechner />
         </section>
-        <section id="rendite" className="scroll-mt-24">
-  <RenditeRechner />
-</section>
+
+        <section id="rendite" className="mt-14 scroll-mt-24">
+          <SectionTitle
+            kicker="Rendite-Rechner"
+            title="Einzahlung + Rendite → Endkapital"
+            desc="Unabhängiger Zinseszins-Rechner für monatliche Einzahlungen mit frei wählbarer Rendite und Laufzeit."
+          />
+          <RenditeRechner />
+        </section>
+
         <section id="faq" className="mt-14 scroll-mt-24">
           <SectionTitle
             kicker="FAQ"
@@ -134,8 +165,9 @@ export default function OnePager() {
           <div className="mt-10 rounded-2xl border bg-white p-6 text-sm text-neutral-600 shadow-sm">
             <div className="text-sm font-semibold text-neutral-900">Disclaimer</div>
             <p className="mt-2 max-w-3xl">
-              Dieses Tool berechnet Zulagen und Einzahlungen ausschließlich nach den Regeln, die in deinem Text beschrieben sind.
-              Es ersetzt keine Beratung und erhebt keinen Anspruch auf Vollständigkeit/Verbindlichkeit.
+              Dieses Tool berechnet Zulagen und Einzahlungen ausschließlich nach den
+              Regeln, die in deinem Text beschrieben sind. Es ersetzt keine
+              Beratung und erhebt keinen Anspruch auf Vollständigkeit/Verbindlichkeit.
             </p>
           </div>
         </section>
@@ -155,7 +187,9 @@ function SectionTitle(props: { kicker: string; title: string; desc: string }) {
       <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight text-neutral-900 md:text-3xl">
         {props.title}
       </h2>
-      <p className="mt-2 max-w-3xl text-pretty text-sm text-neutral-600">{props.desc}</p>
+      <p className="mt-2 max-w-3xl text-pretty text-sm text-neutral-600">
+        {props.desc}
+      </p>
     </div>
   );
 }
